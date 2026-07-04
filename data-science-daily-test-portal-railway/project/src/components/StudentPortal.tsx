@@ -1515,7 +1515,7 @@ export default function StudentPortal({ student, onLogout }: StudentPortalProps)
                       <a
                         href={currentZoom || customZoomLinks[activeDay]}
                         target="_blank"
-                        referrerPolicy="no-referrer"
+                        referrerPolicy="strict-origin-when-cross-origin"
                         className="bg-indigo-600 hover:bg-indigo-700 text-white font-mono font-black text-[10px] uppercase py-1 px-3 rounded-md transition shrink-0"
                       >
                         Launch Zoom Meeting Now 🚀
