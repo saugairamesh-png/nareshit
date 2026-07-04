@@ -3,36 +3,32 @@ import express from "express";
 import fs from "fs";
 import path from "path";
 import { createServer as createViteServer } from "vite";
-import { fileURLToPath } from "url";
 import { GoogleGenAI, Type } from "@google/genai";
 import { generateQuizForDay, generateQuizFromMaterial } from "./src/quizGenerator.js";
 import { DayQuiz, Student, CourseLockState, AIInterview, InterviewMessage, AttendanceLog } from "./src/types.js";
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, setDoc, getDocFromServer } from "firebase/firestore";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 
 app.use(express.json({ limit: "100mb" }));
 
-   // Catch body-parser errors (e.g. payload too large / malformed JSON) as JSON
-   // instead of letting Express fall back to a raw HTML 500 response, which the
-   // frontend's `fetch` calls can't parse and surfaces as generic failure alerts.
-   app.use((err: any, _req: express.Request, res: express.Response, next: express.NextFunction) => {
-     if (err) {
-       console.error("[Express Backend] Body parsing error:", err.message);
-       res.status(err.status || 400).json({
-         error: err.type === "entity.too.large"
-           ? "Uploaded data (likely the interview video recording) was too large to process."
-           : "Malformed request body."
-       });
-       return;
-     }
-     next();
-   });
+// Catch body-parser errors (e.g. payload too large / malformed JSON) as JSON
+// instead of letting Express fall back to a raw HTML 500 response, which the
+// frontend's `fetch` calls can't parse and surfaces as generic failure alerts.
+app.use((err: any, _req: express.Request, res: express.Response, next: express.NextFunction) => {
+  if (err) {
+    console.error("[Express Backend] Body parsing error:", err.message);
+    res.status(err.status || 400).json({
+      error: err.type === "entity.too.large"
+        ? "Uploaded data (likely the interview video recording) was too large to process."
+        : "Malformed request body."
+    });
+    return;
+  }
+  next();
+});
 
 // Lightweight health check for Railway's deploy health monitor / uptime checks.
 app.get("/api/health", (_req, res) => {
@@ -2498,18 +2494,33 @@ async function startServer() {
     console.error("[Firebase] Warning: Failed to do initial startup pull from Google Cloud Firestore:", err);
   }
 
-  if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
-    app.use(vite.middlewares);
+  // Decide dev vs. production serving based on whether a production build actually
+  // exists, not just NODE_ENV — Railway's start command doesn't set NODE_ENV itself,
+  // so relying on it alone can silently boot the Vite dev server in production and,
+  // if that fails, crash the process before it ever binds to PORT (causing healthcheck
+  // failures even though the build succeeded).
+  const distPath = path.join(process.cwd(), "dist");
+  const distIndexExists = fs.existsSync(path.join(distPath, "index.html"));
+
+  if (!distIndexExists) {
+    try {
+      const vite = await createViteServer({
+        server: { middlewareMode: true },
+        appType: "spa",
+      });
+      app.use(vite.middlewares);
+      console.log("[Express Backend] No production build found — running Vite dev middleware.");
+    } catch (viteErr) {
+      console.error("[Express Backend] Failed to start Vite dev middleware:", viteErr);
+      // Fall through and still bind the port below so the health check (and API
+      // routes) stay up even if the dev-only asset pipeline couldn't start.
+    }
   } else {
-    const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
     app.get("*", (req, res) => {
       res.sendFile(path.join(distPath, "index.html"));
     });
+    console.log("[Express Backend] Serving production build from /dist.");
   }
 
   app.listen(PORT, "0.0.0.0", () => {
