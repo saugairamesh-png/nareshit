@@ -53,6 +53,7 @@ export default function StudentPortal({ student, onLogout }: StudentPortalProps)
   const [activeTab, setActiveTab] = useState<"curriculum" | "assessments" | "interview" | "careers" | "resume">("curriculum");
   const [studentInterviews, setStudentInterviews] = useState<AIInterview[]>([]);
   const [jobLocation, setJobLocation] = useState<string>("Hyderabad, India");
+  const [jobTimeFilter, setJobTimeFilter] = useState<"1h" | "24h" | "week" | "month" | "any">("24h");
 
   // Resume Analyzer States
   const [resumeText, setResumeText] = useState<string>("");
@@ -1515,7 +1516,7 @@ export default function StudentPortal({ student, onLogout }: StudentPortalProps)
                       <a
                         href={currentZoom || customZoomLinks[activeDay]}
                         target="_blank"
-                        referrerPolicy="strict-origin-when-cross-origin"
+                        referrerPolicy="no-referrer"
                         className="bg-indigo-600 hover:bg-indigo-700 text-white font-mono font-black text-[10px] uppercase py-1 px-3 rounded-md transition shrink-0"
                       >
                         Launch Zoom Meeting Now 🚀
@@ -2532,6 +2533,23 @@ export default function StudentPortal({ student, onLogout }: StudentPortalProps)
                       <Search className="w-4 h-4 text-white/40 absolute right-3 top-2.5" />
                     </div>
                   </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[10px] text-slate-300 font-mono font-bold uppercase">
+                      Posted Within
+                    </label>
+                    <select
+                      value={jobTimeFilter}
+                      onChange={(e) => setJobTimeFilter(e.target.value as typeof jobTimeFilter)}
+                      className="bg-white/10 hover:bg-white/15 focus:bg-white/18 text-white text-xs font-mono font-bold py-2 px-3 rounded-xl outline-none border border-white/15 focus:border-indigo-500 transition w-full sm:w-44 cursor-pointer"
+                    >
+                      <option className="text-slate-900" value="1h">🔴 Last 1 Hour</option>
+                      <option className="text-slate-900" value="24h">🟠 Last 24 Hours</option>
+                      <option className="text-slate-900" value="week">🟡 Last 7 Days</option>
+                      <option className="text-slate-900" value="month">🟢 Last 30 Days</option>
+                      <option className="text-slate-900" value="any">⚪ Any Time</option>
+                    </select>
+                  </div>
                 </div>
               </div>
 
@@ -2659,6 +2677,19 @@ export default function StudentPortal({ student, onLogout }: StudentPortalProps)
                   const pandasDone = submissions.filter(sub => sub.dayNumber >= 46 && sub.dayNumber <= 75).length;
                   const mlDone = submissions.filter(sub => sub.dayNumber >= 76 && sub.dayNumber <= 105).length;
 
+                  // Map the selected "Posted Within" filter to each job portal's own date-filter query params.
+                  const TIME_FILTER_PARAMS: Record<string, { linkedin: string; indeedDays: number | null; naukriDays: number | null; googleTbs: string }> = {
+                    "1h": { linkedin: "&f_TPR=r3600", indeedDays: 1, naukriDays: 1, googleTbs: "&tbs=qdr:h" },
+                    "24h": { linkedin: "&f_TPR=r86400", indeedDays: 1, naukriDays: 1, googleTbs: "&tbs=qdr:d" },
+                    "week": { linkedin: "&f_TPR=r604800", indeedDays: 7, naukriDays: 7, googleTbs: "&tbs=qdr:w" },
+                    "month": { linkedin: "&f_TPR=r2592000", indeedDays: 30, naukriDays: 30, googleTbs: "&tbs=qdr:m" },
+                    "any": { linkedin: "", indeedDays: null, naukriDays: null, googleTbs: "" }
+                  };
+                  const timeParams = TIME_FILTER_PARAMS[jobTimeFilter];
+                  const timeFilterLabel: Record<string, string> = {
+                    "1h": "Last 1 Hour", "24h": "Last 24 Hours", "week": "Last 7 Days", "month": "Last 30 Days", "any": "Any Time"
+                  };
+
                   // Fallback/standard classroom roles
                   const classRoles = [
                     {
@@ -2696,6 +2727,9 @@ export default function StudentPortal({ student, onLogout }: StudentPortalProps)
                           <span className="text-slate-300 font-bold font-mono text-xs">
                             {isResumeMode ? "AI Resume-Matched Roles" : "Verified Classroom Tracks:"}
                           </span>
+                          <span className="bg-rose-600/25 border border-rose-500/40 text-rose-300 font-mono text-[9px] font-bold px-2 py-0.5 rounded-lg uppercase tracking-wide">
+                            🕐 {timeFilterLabel[jobTimeFilter]}
+                          </span>
                         </div>
 
                         {/* Badges strip */}
@@ -2719,11 +2753,11 @@ export default function StudentPortal({ student, onLogout }: StudentPortalProps)
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {activeRolesList.map((role: any, idx: number) => {
-                          const linkedinUrl = `https://www.linkedin.com/jobs/search/?keywords=${encodeURIComponent(role.searchQuery)}&location=${encodeURIComponent(jobLocation)}&f_TPR=r2592000`;
-                          const indeedUrl = `https://www.indeed.com/jobs?q=${encodeURIComponent(role.searchQuery)}&l=${encodeURIComponent(jobLocation)}`;
-                          const naukriUrl = `https://www.naukri.com/${encodeURIComponent(role.searchQuery.replace(/\s+/g, '-'))}-jobs-in-${encodeURIComponent(jobLocation.split(',')[0].trim().toLowerCase())}`;
+                          const linkedinUrl = `https://www.linkedin.com/jobs/search/?keywords=${encodeURIComponent(role.searchQuery)}&location=${encodeURIComponent(jobLocation)}${timeParams.linkedin}`;
+                          const indeedUrl = `https://www.indeed.com/jobs?q=${encodeURIComponent(role.searchQuery)}&l=${encodeURIComponent(jobLocation)}${timeParams.indeedDays ? `&fromage=${timeParams.indeedDays}` : ""}`;
+                          const naukriUrl = `https://www.naukri.com/${encodeURIComponent(role.searchQuery.replace(/\s+/g, '-'))}-jobs-in-${encodeURIComponent(jobLocation.split(',')[0].trim().toLowerCase())}${timeParams.naukriDays ? `?jobAge=${timeParams.naukriDays}` : ""}`;
                           const wellfoundUrl = `https://wellfound.com/jobs?q=${encodeURIComponent(role.searchQuery)}&l=${encodeURIComponent(jobLocation)}`;
-                          const googleUrl = `https://www.google.com/search?q=${encodeURIComponent(role.searchQuery + ' jobs in ' + jobLocation)}&ibp=htl;jobs`;
+                          const googleUrl = `https://www.google.com/search?q=${encodeURIComponent(role.searchQuery + ' jobs in ' + jobLocation)}&ibp=htl;jobs${timeParams.googleTbs}`;
 
                           return (
                             <div 
@@ -3553,8 +3587,8 @@ export default function StudentPortal({ student, onLogout }: StudentPortalProps)
                   title={selectedVideo.title}
                   className="absolute inset-0 w-full h-full border-0"
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  referrerPolicy="strict-origin-when-cross-origin"
                   allowFullScreen
-                  referrerPolicy="no-referrer"
                 />
               ) : (
                 <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6 space-y-4">

@@ -62,6 +62,10 @@ export default function TeacherDashboard({ onLogout }: TeacherDashboardProps) {
   const [activeTab, setActiveTab] = useState<"attendance" | "students" | "locks" | "quizzes" | "interviews" | "videos" | "tests" | "featureAccess">("attendance");
   const [loading, setLoading] = useState(true);
 
+  // Tracks which variant index was last loaded per course+testType so
+  // "Load Weekly/Monthly Pack" doesn't hand out the same repeated questions every time.
+  const [lastPresetVariant, setLastPresetVariant] = useState<Record<string, number>>({});
+
   // Video Management States
   const [learningVideos, setLearningVideos] = useState<any[]>([]);
   const [videoError, setVideoError] = useState<string | null>(null);
@@ -103,6 +107,9 @@ export default function TeacherDashboard({ onLogout }: TeacherDashboardProps) {
   });
   const [newTestMcqs, setNewTestMcqs] = useState<any[]>([]);
   const [newTestCoding, setNewTestCoding] = useState<any[]>([]);
+  const [showBulkQuestionImport, setShowBulkQuestionImport] = useState(false);
+  const [bulkQuestionImportText, setBulkQuestionImportText] = useState("");
+  const [bulkQuestionImportError, setBulkQuestionImportError] = useState<string | null>(null);
 
   // Filter attendance day
   const [monitorDay, setMonitorDay] = useState<number>(1);
@@ -247,9 +254,10 @@ export default function TeacherDashboard({ onLogout }: TeacherDashboardProps) {
     }
   };
 
-  const EXAM_PRESETS: Record<string, Record<string, { topic: string; duration: number; mcqs: any[]; coding: any[] }>> = {
+  const EXAM_PRESETS: Record<string, Record<string, Array<{ topic: string; duration: number; mcqs: any[]; coding: any[] }>>> = {
     python: {
-      weekly: {
+      weekly: [
+        {
         topic: "List Comprehensions, Slicing & Conditionals",
         duration: 30,
         mcqs: [
@@ -273,8 +281,60 @@ export default function TeacherDashboard({ onLogout }: TeacherDashboardProps) {
             expectedKeywords: "def,return,range,%"
           }
         ]
-      },
-      monthly: {
+        },
+        {
+        topic: "String Slicing, Exceptions & Mutability",
+        duration: 30,
+        mcqs: [
+          {
+            questionText: "What is the output of 'Hello'[1:4]?",
+            options: ["Hel", "ell", "ello", "Hell"],
+            correctOption: 1,
+            explanation: "Slicing [1:4] takes characters at indices 1, 2, 3 -> 'e', 'l', 'l' = 'ell'."
+          },
+          {
+            questionText: "Which keyword is used to catch exceptions in Python?",
+            options: ["catch", "except", "rescue", "handle"],
+            correctOption: 1,
+            explanation: "Python uses try/except blocks to catch and handle exceptions."
+          }
+        ],
+        coding: [
+          {
+            questionText: "Write a function 'reverse_string(s)' that returns the reverse of a string using slicing.",
+            starterCode: "def reverse_string(s):\n    # Use slicing\n    pass",
+            expectedKeywords: "def,return,[::-1]"
+          }
+        ]
+        },
+        {
+        topic: "Ranges, Mutable vs Immutable Types & Palindromes",
+        duration: 30,
+        mcqs: [
+          {
+            questionText: "What does list(range(2, 10, 2)) return?",
+            options: ["[2, 4, 6, 8]", "[2, 4, 6, 8, 10]", "[2, 3, 4, 5, 6, 7, 8, 9]", "[0, 2, 4, 6, 8]"],
+            correctOption: 0,
+            explanation: "range(2, 10, 2) starts at 2, stops before 10, stepping by 2: 2, 4, 6, 8."
+          },
+          {
+            questionText: "Which of these is a mutable data type in Python?",
+            options: ["tuple", "string", "list", "int"],
+            correctOption: 2,
+            explanation: "Lists are mutable; tuples, strings, and ints are immutable in Python."
+          }
+        ],
+        coding: [
+          {
+            questionText: "Write a function 'is_palindrome(s)' that checks if a string reads the same forwards and backwards.",
+            starterCode: "def is_palindrome(s):\n    # Compare s to its reverse\n    pass",
+            expectedKeywords: "def,return,[::-1],=="
+          }
+        ]
+        }
+      ],
+      monthly: [
+        {
         topic: "Generators, Iterators, Custom Decorators & Context Managers",
         duration: 60,
         mcqs: [
@@ -308,10 +368,82 @@ export default function TeacherDashboard({ onLogout }: TeacherDashboardProps) {
             expectedKeywords: "yield,def,while"
           }
         ]
-      }
+        },
+        {
+        topic: "Static Methods, Context Managers & Decorators",
+        duration: 60,
+        mcqs: [
+          {
+            questionText: "What is the purpose of the @staticmethod decorator?",
+            options: [
+              "It defines a method that takes the class itself as first argument",
+              "It defines a method that doesn't access instance or class state",
+              "It automatically caches the method's return value",
+              "It makes a method run only once per program"
+            ],
+            correctOption: 1,
+            explanation: "@staticmethod defines a method that behaves like a plain function, with no access to self or cls."
+          },
+          {
+            questionText: "Which statement about Python's 'with' statement (context manager) is true?",
+            options: [
+              "It permanently locks a file from being read again",
+              "It ensures setup and cleanup code (like closing a file) run automatically, even on error",
+              "It only works with print statements",
+              "It replaces the need for try/except entirely"
+            ],
+            correctOption: 1,
+            explanation: "Context managers guarantee cleanup logic (e.g. closing a file) runs, even if an exception occurs inside the block."
+          }
+        ],
+        coding: [
+          {
+            questionText: "Write a decorator function 'timer' that wraps a function and prints how long it took to run.",
+            starterCode: "def timer(func):\n    def wrapper(*args, **kwargs):\n        # Measure and print elapsed time\n        pass\n    return wrapper",
+            expectedKeywords: "def,return,time,wrapper"
+          }
+        ]
+        },
+        {
+        topic: "Yield From, Custom Iterators & Countdown Generators",
+        duration: 60,
+        mcqs: [
+          {
+            questionText: "What does the 'yield from' statement do inside a generator?",
+            options: [
+              "It raises an exception immediately",
+              "It delegates part of a generator's operations to another generator or iterable",
+              "It converts a generator into a list",
+              "It stops the generator permanently"
+            ],
+            correctOption: 1,
+            explanation: "'yield from' delegates iteration to a sub-generator or iterable, yielding all its values in turn."
+          },
+          {
+            questionText: "Which combination is required to build a custom iterator class in Python?",
+            options: [
+              "__init__ and __str__",
+              "__iter__ and __next__",
+              "__len__ and __getitem__ only",
+              "__call__ and __repr__"
+            ],
+            correctOption: 1,
+            explanation: "A custom iterator class must implement __iter__ (returning self) and __next__ (returning the next value or raising StopIteration)."
+          }
+        ],
+        coding: [
+          {
+            questionText: "Write a generator function 'countdown(n)' that yields numbers from n down to 1.",
+            starterCode: "def countdown(n):\n    # Yield n, n-1, ..., 1\n    pass",
+            expectedKeywords: "yield,def,while"
+          }
+        ]
+        }
+      ]
     },
     numpy: {
-      weekly: {
+      weekly: [
+        {
         topic: "NumPy Arrays, Slicing & Broadcasting basics",
         duration: 30,
         mcqs: [
@@ -334,8 +466,53 @@ export default function TeacherDashboard({ onLogout }: TeacherDashboardProps) {
             expectedKeywords: "eye,return,def"
           }
         ]
-      },
-      monthly: {
+        },
+        {
+        topic: "Array Shapes, Row Sums & Reductions",
+        duration: 30,
+        mcqs: [
+          {
+            questionText: "What does array broadcasting allow NumPy to do?",
+            options: [
+              "Perform arithmetic between arrays of different but compatible shapes without explicit loops",
+              "Automatically convert arrays to Python lists",
+              "Broadcast a live video feed of array operations",
+              "Only add scalars to 1D arrays"
+            ],
+            correctOption: 0,
+            explanation: "Broadcasting lets NumPy apply element-wise operations across arrays of different (but compatible) shapes without manual loops."
+          }
+        ],
+        coding: [
+          {
+            questionText: "Write a function 'row_sums(arr)' that returns the sum of each row of a 2D NumPy array using axis=1.",
+            starterCode: "def row_sums(arr):\n    # Use arr.sum(axis=1)\n    pass",
+            expectedKeywords: "sum,axis,return,def"
+          }
+        ]
+        },
+        {
+        topic: "Array Shape, Zeros & Flattening",
+        duration: 30,
+        mcqs: [
+          {
+            questionText: "What is the shape of np.zeros((3, 4))?",
+            options: ["(4, 3)", "(3, 4)", "(12,)", "(3, 4, 1)"],
+            correctOption: 1,
+            explanation: "np.zeros((3, 4)) creates an array with 3 rows and 4 columns, so its shape is (3, 4)."
+          }
+        ],
+        coding: [
+          {
+            questionText: "Write a function 'flatten_array(arr)' that returns a 1D flattened version of a 2D NumPy array.",
+            starterCode: "def flatten_array(arr):\n    # Use arr.flatten() or arr.ravel()\n    pass",
+            expectedKeywords: "flatten,return,def"
+          }
+        ]
+        }
+      ],
+      monthly: [
+        {
         topic: "Vectorization, Advanced Indexing & Array Aggregations",
         duration: 60,
         mcqs: [
@@ -358,10 +535,55 @@ export default function TeacherDashboard({ onLogout }: TeacherDashboardProps) {
             expectedKeywords: "mean,std,return,def"
           }
         ]
-      }
+        },
+        {
+        topic: "Argmax, Clipping & Conditional Selection",
+        duration: 60,
+        mcqs: [
+          {
+            questionText: "What does np.argmax(arr) return?",
+            options: [
+              "The largest value in arr",
+              "The index of the largest value in arr",
+              "The sum of all values in arr",
+              "A sorted copy of arr"
+            ],
+            correctOption: 1,
+            explanation: "np.argmax returns the index of the maximum value in the array, not the value itself."
+          }
+        ],
+        coding: [
+          {
+            questionText: "Write a function 'clip_values(arr, low, high)' that clips array values to stay within [low, high] using np.clip.",
+            starterCode: "def clip_values(arr, low, high):\n    # Use np.clip\n    pass",
+            expectedKeywords: "clip,return,def"
+          }
+        ]
+        },
+        {
+        topic: "Boolean Masking & Conditional Aggregation",
+        duration: 60,
+        mcqs: [
+          {
+            questionText: "Which NumPy function is used for element-wise conditional selection between two arrays?",
+            options: ["np.select()", "np.where()", "np.choose_if()", "np.filter()"],
+            correctOption: 1,
+            explanation: "np.where(condition, x, y) selects elements from x or y depending on the condition, element-wise."
+          }
+        ],
+        coding: [
+          {
+            questionText: "Write a function 'above_mean_sum(arr)' that returns the sum of elements greater than the array's mean using boolean indexing.",
+            starterCode: "def above_mean_sum(arr):\n    # Use boolean indexing with arr.mean()\n    pass",
+            expectedKeywords: "mean,sum,return,def"
+          }
+        ]
+        }
+      ]
     },
     pandas: {
-      weekly: {
+      weekly: [
+        {
         topic: "Pandas DataFrame Selection, Filtering & Indexing",
         duration: 35,
         mcqs: [
@@ -384,8 +606,48 @@ export default function TeacherDashboard({ onLogout }: TeacherDashboardProps) {
             expectedKeywords: "df,Salary,>,return"
           }
         ]
-      },
-      monthly: {
+        },
+        {
+        topic: "Previewing Data & Unique Values",
+        duration: 35,
+        mcqs: [
+          {
+            questionText: "Which method returns the first 5 rows of a DataFrame by default?",
+            options: ["df.top()", "df.first()", "df.head()", "df.preview()"],
+            correctOption: 2,
+            explanation: "df.head() returns the first n rows of a DataFrame, defaulting to 5 rows."
+          }
+        ],
+        coding: [
+          {
+            questionText: "Write a function 'get_unique_values(df, col)' that returns the unique values of a given column.",
+            starterCode: "def get_unique_values(df, col):\n    # Use df[col].unique()\n    pass",
+            expectedKeywords: "unique,return,def"
+          }
+        ]
+        },
+        {
+        topic: "Missing Data Detection & Removal",
+        duration: 35,
+        mcqs: [
+          {
+            questionText: "How do you check for missing values in a DataFrame df?",
+            options: ["df.missing()", "df.isnull()", "df.na()", "df.checkNull()"],
+            correctOption: 1,
+            explanation: "df.isnull() returns a same-shaped DataFrame of booleans marking where values are missing (NaN)."
+          }
+        ],
+        coding: [
+          {
+            questionText: "Write a function 'drop_na_rows(df)' that returns df with all rows containing any NaN removed.",
+            starterCode: "def drop_na_rows(df):\n    # Use df.dropna()\n    pass",
+            expectedKeywords: "dropna,return,def"
+          }
+        ]
+        }
+      ],
+      monthly: [
+        {
         topic: "GroupBy Operations, Aggregations, Merging & Handling Missing Data",
         duration: 60,
         mcqs: [
@@ -408,10 +670,55 @@ export default function TeacherDashboard({ onLogout }: TeacherDashboardProps) {
             expectedKeywords: "groupby,mean,return,def"
           }
         ]
-      }
+        },
+        {
+        topic: "Merging DataFrames & Filling Missing Values",
+        duration: 60,
+        mcqs: [
+          {
+            questionText: "What does pd.merge(df1, df2, on='id', how='left') do?",
+            options: [
+              "Stacks df1 and df2 vertically without matching keys",
+              "Joins df1 and df2 on the 'id' column, keeping all rows from df1",
+              "Deletes rows in df1 that don't exist in df2",
+              "Sorts df1 by the 'id' column only"
+            ],
+            correctOption: 1,
+            explanation: "A left merge keeps every row from df1, matching in columns from df2 wherever the 'id' key aligns."
+          }
+        ],
+        coding: [
+          {
+            questionText: "Write a function 'fill_missing_with_mean(df, col)' that fills NaN values in col with that column's mean.",
+            starterCode: "def fill_missing_with_mean(df, col):\n    # Use df[col].fillna(df[col].mean())\n    pass",
+            expectedKeywords: "fillna,mean,return,def"
+          }
+        ]
+        },
+        {
+        topic: "Pivoting & Concatenating DataFrames",
+        duration: 60,
+        mcqs: [
+          {
+            questionText: "Which method is used to reshape a DataFrame into a spreadsheet-style pivot table?",
+            options: ["df.reshape()", "df.pivot_table()", "df.transpose_table()", "df.spread()"],
+            correctOption: 1,
+            explanation: "df.pivot_table() reshapes data by grouping and aggregating values into a spreadsheet-style table."
+          }
+        ],
+        coding: [
+          {
+            questionText: "Write a function 'concat_frames(df1, df2)' that concatenates two DataFrames vertically (stacking rows).",
+            starterCode: "def concat_frames(df1, df2):\n    # Use pd.concat\n    pass",
+            expectedKeywords: "concat,return,def"
+          }
+        ]
+        }
+      ]
     },
     ml: {
-      weekly: {
+      weekly: [
+        {
         topic: "Supervised Learning Algorithms, Regression & Classification concepts",
         duration: 30,
         mcqs: [
@@ -434,8 +741,53 @@ export default function TeacherDashboard({ onLogout }: TeacherDashboardProps) {
             expectedKeywords: "fit,return,def"
           }
         ]
-      },
-      monthly: {
+        },
+        {
+        topic: "Classification vs Regression & Data Splitting",
+        duration: 30,
+        mcqs: [
+          {
+            questionText: "What is the main difference between classification and regression?",
+            options: [
+              "Classification predicts continuous values; regression predicts categories",
+              "Classification predicts discrete categories; regression predicts continuous values",
+              "They are two names for the same technique",
+              "Regression can only be used with images"
+            ],
+            correctOption: 1,
+            explanation: "Classification predicts discrete class labels, while regression predicts continuous numeric values."
+          }
+        ],
+        coding: [
+          {
+            questionText: "Write a function 'split_shapes(X, y, test_size)' that splits data using train_test_split and returns the shapes of the resulting train/test sets.",
+            starterCode: "def split_shapes(X, y, test_size):\n    # Use train_test_split from sklearn.model_selection\n    pass",
+            expectedKeywords: "train_test_split,return,def"
+          }
+        ]
+        },
+        {
+        topic: "Regression Evaluation Metrics",
+        duration: 30,
+        mcqs: [
+          {
+            questionText: "Which metric is commonly used to evaluate regression models?",
+            options: ["Accuracy", "F1 Score", "Mean Squared Error (MSE)", "Confusion Matrix"],
+            correctOption: 2,
+            explanation: "Mean Squared Error measures the average squared difference between predicted and actual values, standard for regression tasks."
+          }
+        ],
+        coding: [
+          {
+            questionText: "Write a function 'mean_squared_error_manual(y_true, y_pred)' that computes MSE without using sklearn.",
+            starterCode: "def mean_squared_error_manual(y_true, y_pred):\n    # Compute average squared error manually\n    pass",
+            expectedKeywords: "sum,len,return,def"
+          }
+        ]
+        }
+      ],
+      monthly: [
+        {
         topic: "Model Evaluation Metrics, Overfitting & Feature Engineering",
         duration: 60,
         mcqs: [
@@ -458,13 +810,118 @@ export default function TeacherDashboard({ onLogout }: TeacherDashboardProps) {
             expectedKeywords: "sum,len,==,return,def"
           }
         ]
-      }
+        },
+        {
+        topic: "Regularization & Weight Penalties",
+        duration: 60,
+        mcqs: [
+          {
+            questionText: "What is the main purpose of regularization in machine learning models?",
+            options: [
+              "To speed up data loading",
+              "To penalize overly complex models and reduce overfitting",
+              "To automatically clean missing data",
+              "To visualize model predictions"
+            ],
+            correctOption: 1,
+            explanation: "Regularization adds a penalty for model complexity (e.g. large weights), discouraging overfitting and improving generalization."
+          }
+        ],
+        coding: [
+          {
+            questionText: "Write a function 'l2_penalty(weights, lambda_)' that computes the L2 regularization term (lambda_ times sum of squared weights).",
+            starterCode: "def l2_penalty(weights, lambda_):\n    # Sum of squared weights times lambda_\n    pass",
+            expectedKeywords: "sum,return,def"
+          }
+        ]
+        },
+        {
+        topic: "Cross-Validation & Fold Splitting",
+        duration: 60,
+        mcqs: [
+          {
+            questionText: "What is the main purpose of cross-validation?",
+            options: [
+              "To permanently remove outliers from a dataset",
+              "To get a more reliable estimate of model performance by testing on multiple data splits",
+              "To convert categorical data into numbers",
+              "To speed up model training by using less data"
+            ],
+            correctOption: 1,
+            explanation: "Cross-validation splits data into multiple folds and averages performance across them, giving a more robust estimate than a single train/test split."
+          }
+        ],
+        coding: [
+          {
+            questionText: "Write a function 'k_fold_indices(n, k)' that returns a list of k roughly equal-sized index ranges for n samples.",
+            starterCode: "def k_fold_indices(n, k):\n    # Split range(n) into k roughly equal chunks\n    pass",
+            expectedKeywords: "range,len,return,def"
+          }
+        ]
+        }
+      ]
     }
   };
 
+  const handleBulkQuestionImportSubmit = () => {
+    setBulkQuestionImportError(null);
+    let parsed: any;
+    try {
+      parsed = JSON.parse(bulkQuestionImportText);
+    } catch (e) {
+      setBulkQuestionImportError("That doesn't look like valid JSON. Check for missing commas, quotes, or brackets.");
+      return;
+    }
+
+    const incomingMcqs = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.mcqs) ? parsed.mcqs : [];
+    const incomingCoding = Array.isArray(parsed?.coding) ? parsed.coding : [];
+
+    if (incomingMcqs.length === 0 && incomingCoding.length === 0) {
+      setBulkQuestionImportError('No questions found. Expected {"mcqs": [...], "coding": [...]} or a plain array of MCQs.');
+      return;
+    }
+
+    const cleanedMcqs = incomingMcqs
+      .filter((q: any) => q && typeof q.questionText === "string" && Array.isArray(q.options))
+      .map((q: any) => ({
+        questionText: q.questionText,
+        options: q.options.map((o: any) => String(o)),
+        correctOption: Number.isInteger(q.correctOption) ? q.correctOption : 0,
+        explanation: typeof q.explanation === "string" ? q.explanation : ""
+      }));
+
+    const cleanedCoding = incomingCoding
+      .filter((c: any) => c && typeof c.questionText === "string")
+      .map((c: any) => ({
+        questionText: c.questionText,
+        starterCode: typeof c.starterCode === "string" ? c.starterCode : "",
+        expectedKeywords: typeof c.expectedKeywords === "string"
+          ? c.expectedKeywords
+          : Array.isArray(c.expectedKeywords) ? c.expectedKeywords.join(",") : ""
+      }));
+
+    if (cleanedMcqs.length === 0 && cleanedCoding.length === 0) {
+      setBulkQuestionImportError("Found entries, but none had the required fields (questionText + options for MCQs, questionText for coding challenges).");
+      return;
+    }
+
+    setNewTestMcqs([...newTestMcqs, ...cleanedMcqs]);
+    setNewTestCoding([...newTestCoding, ...cleanedCoding]);
+    setBulkQuestionImportText("");
+    setShowBulkQuestionImport(false);
+  };
+
   const handleLoadExamPreset = (courseSlug: string, testType: string) => {
-    const preset = EXAM_PRESETS[courseSlug]?.[testType];
-    if (preset) {
+    const variants = EXAM_PRESETS[courseSlug]?.[testType];
+    if (variants && variants.length > 0) {
+      const presetKey = `${courseSlug}:${testType}`;
+      let nextIndex = Math.floor(Math.random() * variants.length);
+      if (variants.length > 1 && lastPresetVariant[presetKey] === nextIndex) {
+        // Avoid handing back the same variant twice in a row.
+        nextIndex = (nextIndex + 1) % variants.length;
+      }
+      setLastPresetVariant({ ...lastPresetVariant, [presetKey]: nextIndex });
+      const preset = variants[nextIndex];
       const typeLabel = testType === "weekly" ? "Weekly" : "Monthly";
       const courseLabel = courseSlug === "python" ? "Python" : courseSlug === "numpy" ? "NumPy" : courseSlug === "pandas" ? "Pandas" : "Machine Learning";
       setNewTestForm({
@@ -3596,6 +4053,82 @@ export default function TeacherDashboard({ onLogout }: TeacherDashboardProps) {
                 >
                   ✨ Load {newTestForm.testType === "weekly" ? "Weekly" : "Monthly"} Pack
                 </button>
+              </div>
+
+              {/* Bulk Import Questions */}
+              <div className="border border-emerald-200 bg-emerald-50 rounded-xl p-3.5 space-y-2.5">
+                <button
+                  type="button"
+                  onClick={() => setShowBulkQuestionImport(!showBulkQuestionImport)}
+                  className="w-full flex items-center justify-between text-left cursor-pointer"
+                >
+                  <div>
+                    <div className="text-xs font-black text-emerald-950 uppercase tracking-wide flex items-center gap-1.5">
+                      <span>📋 Bulk Import Questions (Paste JSON)</span>
+                    </div>
+                    <div className="text-[10px] text-emerald-700 font-medium">Paste many MCQs and coding challenges at once instead of adding them one by one.</div>
+                  </div>
+                  <span className="text-emerald-700 text-xs font-bold shrink-0 ml-2">{showBulkQuestionImport ? "▲ Hide" : "▼ Open"}</span>
+                </button>
+
+                {showBulkQuestionImport && (
+                  <div className="space-y-2 pt-1">
+                    <p className="text-[10px] text-emerald-800 leading-relaxed">
+                      Paste JSON in this shape (either key is optional if you only have one type):
+                    </p>
+                    <pre className="bg-emerald-950 text-emerald-100 text-[9.5px] leading-snug rounded-lg p-2.5 overflow-x-auto">
+{`{
+  "mcqs": [
+    {
+      "questionText": "What does len([1,2,3]) return?",
+      "options": ["2", "3", "4", "Error"],
+      "correctOption": 1,
+      "explanation": "The list has 3 elements."
+    }
+  ],
+  "coding": [
+    {
+      "questionText": "Write a function double(n) that returns n*2.",
+      "starterCode": "def double(n):\\n    pass",
+      "expectedKeywords": "def,return"
+    }
+  ]
+}`}
+                    </pre>
+                    <textarea
+                      rows={8}
+                      value={bulkQuestionImportText}
+                      onChange={(e) => {
+                        setBulkQuestionImportText(e.target.value);
+                        if (bulkQuestionImportError) setBulkQuestionImportError(null);
+                      }}
+                      placeholder='Paste your JSON here...'
+                      className="w-full bg-white border border-emerald-300 rounded-lg p-2 font-mono text-[10.5px] focus:outline-none focus:ring-1 focus:ring-emerald-500 resize-y"
+                    />
+                    {bulkQuestionImportError && (
+                      <p className="text-[10.5px] text-rose-700 font-semibold bg-rose-50 border border-rose-200 rounded-lg p-2">
+                        ⚠ {bulkQuestionImportError}
+                      </p>
+                    )}
+                    <div className="flex justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => { setBulkQuestionImportText(""); setBulkQuestionImportError(null); }}
+                        className="text-[10.5px] text-emerald-700 hover:text-emerald-900 font-bold py-1.5 px-3 cursor-pointer"
+                      >
+                        Clear
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleBulkQuestionImportSubmit}
+                        disabled={!bulkQuestionImportText.trim()}
+                        className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-mono font-bold text-[10.5px] uppercase py-1.5 px-3.5 rounded-lg transition shrink-0 shadow-xs cursor-pointer"
+                      >
+                        ⬆ Import Questions
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* MCQs Builder */}
