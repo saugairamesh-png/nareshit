@@ -4143,10 +4143,10 @@ export default function TeacherDashboard({ onLogout }: TeacherDashboardProps) {
                       setNewTestMcqs([
                         ...newTestMcqs,
                         {
-                          questionText: "What is the output of np.array([1, 2, 3]) * 2?",
-                          options: ["[2, 4, 6]", "[1, 2, 3, 1, 2, 3]", "array([2, 4, 6])", "Error"],
-                          correctOption: 2,
-                          explanation: "Element-wise multiplication multiplies each value by 2 in a NumPy ndarray."
+                          questionText: "",
+                          options: ["", "", "", ""],
+                          correctOption: 0,
+                          explanation: ""
                         }
                       ]);
                     }}
@@ -4246,9 +4246,9 @@ export default function TeacherDashboard({ onLogout }: TeacherDashboardProps) {
                       setNewTestCoding([
                         ...newTestCoding,
                         {
-                          questionText: "Write a function sum_array(arr) that returns the sum of all elements in a NumPy array or Python list.",
-                          starterCode: "def sum_array(arr):\n    # Write your code here\n    pass",
-                          expectedKeywords: "sum,return,def"
+                          questionText: "",
+                          starterCode: "",
+                          expectedKeywords: ""
                         }
                       ]);
                     }}
