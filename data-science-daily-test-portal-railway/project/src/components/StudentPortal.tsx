@@ -33,7 +33,7 @@ import {
   Terminal
 } from "lucide-react";
 import { Student, DayQuiz, SYLLABUS, getCourseForDay, getTopicTitleForDay, Submission, AIInterview } from "../types.js";
-import AiInterviewRoom from "./AiInterviewRoom.js";
+import AiInterviewRoom from "./AiInterviewRoom";
 import { ASSESSMENT_PRESETS, SubjectAssessment } from "../assessmentsData.js";
 import StudentAssessmentsView from "./StudentAssessmentsView.js";
 import AtsResumeMaker from "./AtsResumeMaker.js";
